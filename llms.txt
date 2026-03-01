@@ -1,0 +1,35 @@
+# OpenDDIL Edge SDK (.NET) — llms.txt
+# https://llmstxt.org/
+
+> OpenDDIL Edge SDK for .NET manages the local SQLite Outbox on Edge devices.
+> Events are serialized as Protobuf binaries and spooled locally for eventual flush to HQ.
+
+## Project Purpose
+Client-side SDK for DDIL environments. All writes go to a local SQLite Outbox.
+No network calls are made during event creation — the Relay handles sync.
+
+## Architecture
+- Write Path: UI → InventoryOperations → OutboxManager → SQLite Outbox → Relay → Redpanda
+- Read Path: ElectricSQL → SQLite Read-Cache → UI (handled separately)
+- Events are wrapped in CloudEvent envelopes (from openddil-contracts)
+- Payload is serialized Protobuf binary (BLOB in SQLite)
+
+## Key Files
+- src/OpenDdilOutboxManager.cs: Core Outbox manager (enqueue, get pending, mark processed).
+- src/InventoryOperations.cs: High-level AllocateInventory() wrapper for UI developers.
+- src/OutboxRelayService.cs: BackgroundService that flushes Outbox to Redpanda (exponential backoff, Zstd compression).
+- sql/outbox_schema.sql: SQLite schema for outbox_events table.
+
+## Dependencies
+- Microsoft.Data.Sqlite: SQLite access.
+- Google.Protobuf: Protobuf serialization.
+- Confluent.Kafka: Kafka/Redpanda producer (idempotent, Zstd compression).
+- Microsoft.Extensions.Hosting: BackgroundService for the Relay.
+- Generated C# classes from openddil-contracts (make csharp).
+
+## Outbox Table Schema
+- id: TEXT PRIMARY KEY (UUID v4)
+- event_type: TEXT NOT NULL (CloudEvent type URI)
+- payload_bytes: BLOB NOT NULL (serialized CloudEvent Protobuf)
+- created_at: TEXT NOT NULL (ISO 8601 UTC)
+- is_processed: INTEGER NOT NULL DEFAULT 0 (0=pending, 1=flushed)

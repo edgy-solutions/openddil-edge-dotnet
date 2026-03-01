@@ -1,0 +1,38 @@
+# =============================================================================
+# OpenDDIL Edge SDK (.NET) — Cursor Rules
+# =============================================================================
+
+# Project Identity
+You are working in the openddil-edge-dotnet repository — the .NET Edge SDK for
+the OpenDDIL DDIL-resilient CQRS framework.
+
+# Tech Stack (DO NOT deviate)
+- Language: C# (.NET 8+)
+- Database: SQLite via Microsoft.Data.Sqlite (NOT System.Data.SQLite)
+- Serialization: Google.Protobuf (NOT JSON, NOT MessagePack)
+- Event Contracts: Generated from openddil-contracts (NOT defined here)
+- Envelope: CloudEvents v1.0 (from openddil-contracts)
+
+# Architecture Rules
+- ALL writes go through the Outbox. NEVER write directly to a network endpoint.
+- The OutboxManager is the ONLY class that touches SQLite for writes.
+- Domain events MUST be wrapped in a CloudEvent envelope before serialization.
+- payload_bytes stores the FULL CloudEvent (envelope + packed payload), not just the domain event.
+
+# Coding Style
+- PascalCase for public methods and properties.
+- camelCase for private fields with underscore prefix (_connection).
+- XML doc comments on all public members.
+- Async/await for I/O operations in production code.
+- IDisposable pattern for database connections.
+
+# Operation Wrappers
+- Each bounded context gets its own Operations class (e.g., InventoryOperations).
+- Operations classes take OutboxManager + userId in constructor.
+- Operations methods construct the domain event, call Enqueue(), and return the event ID.
+- Operations methods MUST accept the current read-cache value for conflict detection fields.
+
+# Safety
+- NEVER make network calls from the Edge SDK. The Relay handles all network I/O.
+- NEVER modify the Outbox schema without updating both Edge SDK repos symmetrically.
+- NEVER skip the CloudEvent envelope — HQ processors depend on it.
